@@ -1,7 +1,13 @@
+import { produce } from "immer";
+import {
+  AuthenticationDetails,
+  CognitoUserPool,
+  CognitoUser,
+  CognitoUserSession,
+} from "amazon-cognito-identity-js";
 import Form from "@cloudscape-design/components/form";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Button from "@cloudscape-design/components/button";
-import Header from "@cloudscape-design/components/header";
 import {
   Container,
   FormField,
@@ -9,18 +15,72 @@ import {
   Input,
 } from "@cloudscape-design/components";
 import { useCallback, useState } from "react";
+import { create } from "zustand";
+
+interface LoginStore {
+  authToken: string;
+  userPool: CognitoUserPool;
+  currentUser: () => CognitoUser | undefined;
+  signout: () => Promise<void>;
+  signin: (username: string, password: string) => Promise<void>;
+}
+
+function asPromise(fn?: (callback: () => void) => void): Promise<void> {
+  return fn
+    ? new Promise((resolve) => {
+        fn(resolve);
+      })
+    : Promise.resolve();
+}
+
+const toUsername = (email: string) => email.replace("@", "-at-");
+
+const useLoginStore = create<LoginStore>((set, get) => ({
+  authToken: "",
+  userPool: new CognitoUserPool({
+    UserPoolId: import.meta.env.COGNITO_USER_POOL_ID,
+    ClientId: import.meta.env.COGNITO_USER_POOL_CLIENT_ID,
+  }),
+  currentUser: () => {
+    return get().userPool.getCurrentUser() ?? undefined;
+  },
+  signout: async () => {
+    await asPromise(get().currentUser()?.signOut);
+  },
+  signin: async (Username: string, Password: string) => {
+    Username = toUsername(Username);
+    const authenticationDetails = new AuthenticationDetails({
+      Username,
+      Password,
+    });
+
+    const cognitoUser = new CognitoUser({ Username, Pool: get().userPool });
+    const session: CognitoUserSession = await new Promise((r, j) =>
+      cognitoUser.authenticateUser(authenticationDetails, {
+        onSuccess: r,
+        onFailure: j,
+      })
+    );
+    const token = session.getIdToken().getJwtToken();
+
+    console.log("Authenticated to cognito", Username, token);
+
+    set(
+      produce<LoginStore>((state) => {
+        state.authToken = token;
+      })
+    );
+  },
+}));
 
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const signin = useLoginStore((s) => s.signin);
 
   const tryLogin = useCallback(() => {
-    console.log(
-      "Attempting cognito login",
-      username,
-      password.slice(0, 3) + "..." + password.slice(password.length - 3)
-    );
-  }, [username, password]);
+    signin(username, password);
+  }, [username, password, signin]);
 
   return (
     <Grid
