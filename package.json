@@ -11,11 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "^4.3.8",
     "@cloudscape-design/components": "^3.0.209",
     "@cloudscape-design/global-styles": "^1.0.7",
     "amazon-cognito-identity-js": "^6.1.2",
-    "aws-amplify": "^5.0.16",
     "immer": "^9.0.19",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
